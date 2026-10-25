@@ -472,12 +472,54 @@ function mergeInto(remote) {
   D.items = out; D.purged = purged;
 }
 function queueSync(ms = 0) { clearTimeout(SY.timer); SY.timer = setTimeout(sync, ms); }
+// ---------- синхронизация через Яндекс Диск (папка приложения) ----------
+const YA_CLIENT = 'b03c086153504ad3849e914ec74b4240';
+const YA_FILE = 'app:/planer.json';
+const yaHdr = () => ({Authorization: 'OAuth ' + CFG.ya.token});
+function yaLogin() {
+  location.href = `https://oauth.yandex.ru/authorize?response_type=token&client_id=${YA_CLIENT}&redirect_uri=${encodeURIComponent(location.origin + location.pathname)}&state=ya`;
+}
+async function yaGet() {
+  const r = await fetch('https://cloud-api.yandex.net/v1/disk/resources/download?path=' + encodeURIComponent(YA_FILE), {cache: 'no-store', headers: yaHdr()});
+  if (r.status === 404) return null;
+  if (r.status === 401 || r.status === 403) throw new Error('YA_AUTH');
+  if (!r.ok) throw new Error(`Яндекс ответил ${r.status}`);
+  const g = await fetch((await r.json()).href, {cache: 'no-store'});
+  if (!g.ok) throw new Error(`Яндекс ответил ${g.status}`);
+  const t = await g.text();
+  return t ? JSON.parse(t) : null;
+}
+async function yaPut(doc) {
+  const r = await fetch('https://cloud-api.yandex.net/v1/disk/resources/upload?overwrite=true&path=' + encodeURIComponent(YA_FILE), {cache: 'no-store', headers: yaHdr()});
+  if (r.status === 401 || r.status === 403) throw new Error('YA_AUTH');
+  if (!r.ok) throw new Error(`Яндекс ответил ${r.status}`);
+  const p = await fetch((await r.json()).href, {method: 'PUT', body: new Blob([JSON.stringify(doc)], {type: 'application/json'})});
+  if (!p.ok) throw new Error(`Яндекс ответил ${p.status}`);
+}
+// Яндекс не умеет «записать, только если файл не менялся», поэтому после записи перечитываем:
+// если кто-то успел записать между нами, следующий проход сольет и допишет. Записи не теряются.
+async function yaSync() {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const remote = await yaGet();
+    if (remote) mergeInto(remote);
+    REM = remote;
+    saveLocal(); render();
+    const out = {v: 1, items: D.items, purged: D.purged, phone: nowMin()};
+    if (canon(out) === canon(remote)) return;
+    await yaPut(out);
+    REM = out; saveLocal();
+    const check = await yaGet();
+    if (canon(check) === canon(out)) return;
+  }
+}
+
 async function sync() {
-  if (!CFG || CFG.local) return;
+  if (!CFG || (CFG.local && !(CFG.ya && !CFG.ya.bad))) return;
   if (SY.busy) { SY.again = true; return; }
   SY.busy = true; SY.state = 'busy'; renderSync();
   try {
-    for (let attempt = 0; ; attempt++) {
+    if (CFG.ya) await yaSync();
+    else for (let attempt = 0; ; attempt++) {
       if (attempt > 5) throw new Error('облачная копия все время меняется');
       const g = await gh('GET');
       let remote = null;
@@ -504,7 +546,8 @@ async function sync() {
     SY.state = 'ok'; SY.err = ''; SY.last = new Date().toISOString(); LS.set('last', SY.last);
   } catch (e) {
     SY.state = 'err';
-    SY.err = navigator.onLine === false ? 'нет интернета' : (e && e.message === 'Failed to fetch' ? 'нет связи с GitHub' : String(e.message || e));
+    if (e && e.message === 'YA_AUTH') { CFG.ya.bad = true; LS.set('cfg', CFG); }
+    SY.err = navigator.onLine === false ? 'нет интернета' : e && e.message === 'YA_AUTH' ? 'Яндекс: нужно войти заново' : (e && e.message === 'Failed to fetch' ? 'нет связи с сервером' : String(e.message || e));
   } finally {
     SY.busy = false; renderSync();
     if (SY.again) { SY.again = false; queueSync(300); }
@@ -562,7 +605,8 @@ function renderTabs() {
 }
 function renderSync() {
   const b = $('#syncb'); if (!b) return;
-  if (CFG && CFG.local) { b.style.display = 'none'; return; }
+  if (CFG && CFG.local && !CFG.ya) { b.style.display = 'none'; return; }
+  b.style.display = '';
   const cls = SY.state === 'busy' ? 'busy' : SY.state === 'ok' ? 'ok' : SY.state === 'err' ? 'err' : 'warn';
   let txt = SY.state === 'busy' ? 'Синхр…' : SY.state === 'err' ? 'Нет связи' : 'Синхр.';
   if (SY.state === 'ok' && SY.last) { const d = new Date(SY.last); txt = `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
@@ -701,8 +745,22 @@ function vSettingsLocal() {
   else if (perm === 'unsupported' || (ios && !standalone)) notif = `<div class="note">${ios ? 'Сначала добавьте Планер на экран «Домой» (ниже) и откройте его оттуда.' : 'Этот браузер не умеет показывать уведомления.'}</div>`;
   else if (perm === 'denied') notif = '<div class="note">Уведомления запрещены в настройках телефона. Разрешите их там.</div>';
   else notif = `<div style="padding:12px 14px"><button class="btn primary wide" data-act="local-notif">${ic('bell')}Разрешить уведомления</button></div>`;
+  const y = CFG.ya;
+  let ya;
+  if (y && !y.bad) {
+    const last = SY.last ? new Date(SY.last) : null;
+    ya = `<div class="kv"><span>Яндекс Диск</span><span style="color:var(--ok)">подключен</span></div>
+      <div class="kv"><span>Состояние</span><span>${SY.state === 'err' ? `<span style="color:var(--danger)">${esc(SY.err)}</span>` : SY.state === 'busy' ? 'идет…' : 'все в порядке'}</span></div>
+      <div class="kv"><span>Последняя</span><span>${last ? `${last.toLocaleDateString('ru-RU')} ${pad(last.getHours())}:${pad(last.getMinutes())}` : 'еще не было'}</span></div>
+      <div class="note" style="font-size:13px">Записи хранятся в вашем Яндекс Диске, папка «Приложения/Планер». Войдите в Планер с тем же Яндексом на другом телефоне, и записи будут одинаковыми.</div>
+      <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:10px"><button class="btn wide" data-act="sync">${ic('reset')}Синхронизировать сейчас</button><button class="btn danger wide" data-act="ya-off">Отключить Яндекс</button></div>`;
+  } else {
+    ya = `<div class="note">${y && y.bad ? '<b style="color:var(--danger)">Вход в Яндекс устарел, войдите снова.</b><br>' : ''}Войдите через Яндекс, и записи будут храниться на вашем Яндекс Диске. Так их не потерять при смене телефона, и можно пользоваться на двух телефонах сразу.</div>
+      <div style="padding:0 14px 14px"><button class="btn primary wide" data-act="ya-login">Войти через Яндекс</button></div>`;
+  }
   return back() + `
-  <div class="sec"><h3>Где хранятся записи</h3><div class="card note">Только на этом телефоне (${n} ${plural(n, 'запись', 'записи', 'записей')}). Чтобы не потерять их при смене телефона, иногда сохраняйте копию в файл.</div></div>
+  <div class="sec"><h3>Синхронизация</h3><div class="card">${ya}</div></div>
+  <div class="sec"><h3>Где хранятся записи</h3><div class="card note">${y && !y.bad ? 'На этом телефоне и на вашем Яндекс Диске' : 'Только на этом телефоне'} (${n} ${plural(n, 'запись', 'записи', 'записей')}). Копию в файл тоже можно сохранить.</div></div>
   <div class="sec"><h3>Резервная копия</h3><div class="card"><div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
     <button class="btn wide" data-act="export">${ic('note')}Сохранить копию в файл</button>
     <button class="btn wide" data-act="import">${ic('undo')}Восстановить из файла</button>
@@ -907,6 +965,8 @@ document.addEventListener('click', async e => {
     case 'over-today': { live().filter(isOverdue).forEach(i => updateItem(i.id, {date: today()})); return snack('Просроченное перенесено на сегодня'); }
     case 'empty-trash': if (confirm('Удалить все записи из корзины навсегда?')) purge(null); return;
     case 'push': return enablePush();
+    case 'ya-login': return yaLogin();
+    case 'ya-off': if (confirm('Отключить Яндекс? Записи останутся на телефоне и на Диске.')) { delete CFG.ya; LS.set('cfg', CFG); SY.state = 'idle'; render(); } return;
     case 'local-notif': { const r = await Notification.requestPermission(); snack(r === 'granted' ? 'Уведомления разрешены' : 'Уведомления не разрешены'); render(); return; }
     case 'export': {
       const blob = new Blob([JSON.stringify({planer: 1, items: D.items, purged: D.purged}, null, 1)], {type: 'application/json'});
@@ -1017,10 +1077,13 @@ function renderSetup() {
   $('#app').innerHTML = `<div class="setup"><img src="icon-192.png" alt=""><h1>Планер</h1>
   <p>Встречи, дела и напоминания в одном месте. Пишите как говорите: «встреча с врачом в пятницу в 10», «оплатить аренду 5 числа каждого месяца», «напомни через 2 часа позвонить маме».</p>
   <button class="btn primary wide" style="margin-top:18px" data-act="local">Начать</button>
+  <button class="btn wide" style="margin-top:10px" data-act="ya-start">Войти через Яндекс</button>
+  <p style="font-size:13.5px;color:var(--ink3);margin-top:8px">С Яндексом записи хранятся на вашем Яндекс Диске и одинаковы на всех ваших телефонах.</p>
   <details style="margin-top:28px"><summary style="color:var(--ink3);cursor:pointer">У меня Планер на компьютере</summary>
   <p>Откройте на компьютере Планер, «Настройки - Телефон», и наведите камеру телефона на QR-код. Или вставьте ссылку из настроек:</p>
   <input class="in" id="lnk" placeholder="https://…#k=…" autocapitalize="off" autocomplete="off">
   <button class="btn wide" style="margin-top:10px" data-act="link">Подключить</button></details></div>`;
+  $('[data-act=ya-start]').onclick = () => { CFG = {local: true}; LS.set('cfg', CFG); yaLogin(); };
   $('[data-act=local]').onclick = () => { CFG = {local: true}; LS.set('cfg', CFG); TZ = devTZ(); $('#app').innerHTML = ''; render(); };
   $('[data-act=link]').onclick = () => { if (takeLink($('#lnk').value)) { $('#app').innerHTML = ''; render(); queueSync(0); } else snack('Ссылка не подходит'); };
 }
@@ -1042,6 +1105,23 @@ function applyTheme() {
 
 // ---------- запуск ----------
 applyTheme();
+// Возврат после входа в Яндекс: #access_token=...&state=ya  (или #ya=... в значке на экране iPhone)
+(function takeYa() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  const tok = h.get('access_token') && h.get('state') === 'ya' ? h.get('access_token') : h.get('ya');
+  if (!tok) return;
+  const exp = h.get('expires_in') ? Date.now() + +h.get('expires_in') * 1000 : +(h.get('exp') || 0);
+  if (!CFG || !CFG.local) CFG = {local: true};
+  if (!CFG.ya || CFG.ya.token !== tok) { CFG.ya = {token: tok, exp}; LS.set('cfg', CFG); }
+  TZ = devTZ();
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent), sa = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  // на iPhone вне значка оставляем ключ в адресе, чтобы «На экран «Домой»» унес его в значок
+  if (ios && !sa) history.replaceState(null, '', location.pathname + `#ya=${encodeURIComponent(tok)}&exp=${exp}`);
+  else history.replaceState(null, '', location.pathname);
+  setTimeout(() => snack('Яндекс подключен'), 600);
+})();
+h_err();
+function h_err() { const h = new URLSearchParams(location.hash.slice(1)); if (h.get('error') && h.get('state') === 'ya') { history.replaceState(null, '', location.pathname); setTimeout(() => snack('Вход в Яндекс отменен'), 600); return true; } return false; }
 takeLink(location.href);
 // на iPhone ссылку в адресе оставляем, пока приложение не добавлено на экран «Домой»: иначе значок откроется без ключа
 if (location.hash && (matchMedia('(display-mode: standalone)').matches || navigator.standalone || !/iPhone|iPad|iPod/.test(navigator.userAgent))) history.replaceState(null, '', location.pathname);
