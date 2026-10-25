@@ -1,6 +1,6 @@
 // Планер: работа без интернета и уведомления о напоминаниях.
-const CACHE = 'planer-v4';
-const SHELL = ['./', 'index.html', 'parse_ru.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'badge.png'];
+const CACHE = 'planer-v5';
+const SHELL = ['./', 'index.html', 'parse_ru.js', 'cal.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'badge.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));

@@ -133,6 +133,18 @@ header.top>*,main{max-width:640px;margin-left:auto;margin-right:auto}
 .nowline{display:flex;align-items:center;gap:8px;color:var(--danger);font-size:12px;font-weight:700;padding:2px 14px}
 .nowline div{flex:1;height:2px;background:var(--danger);border-radius:2px}
 
+/* --- Яндекс Календарь на главной --- */
+.calc{display:flex;align-items:center;gap:12px;padding:12px 10px 12px 14px;margin-bottom:16px}
+.calc-i{width:40px;height:40px;border-radius:12px;background:var(--meeting-s);color:var(--meeting);display:grid;place-items:center;flex:none}
+.calc-b{flex:1;min-width:0}
+.calc-b b{display:block;font-size:15px}
+.calc-b span{display:block;font-size:13px;color:var(--ink2);line-height:1.35;margin-top:1px}
+.btn.sm2{padding:8px 12px;font-size:14px;border-radius:10px}
+.calline{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink3);margin:-6px 4px 14px}
+.calline svg.i{width:15px;height:15px}
+.calline span{flex:1}
+.calline button{color:var(--accent);font-weight:600;font-size:13px;padding:4px}
+
 /* --- календарь --- */
 .calh{display:flex;align-items:center;gap:6px;margin:0 0 10px}
 .calh b{flex:1;font-size:18px;font-weight:600;padding-left:4px}
@@ -378,8 +390,8 @@ function nextDate(d, rep) {
 const find = id => D.items.find(i => i.id === id);
 const live = () => D.items.filter(i => !i.deleted);
 
-function addItem(fields) {
-  const it = norm(Object.assign({}, fields, {source: 'phone'}));
+function addItem(fields, source = 'phone') {
+  const it = norm(Object.assign({}, fields, {source}));
   it.id = uid(); it.upd = stamp(); it.created = nowMin();
   prime(it);
   D.items.push(it);
@@ -516,6 +528,7 @@ async function yaSync() {
 }
 
 async function sync() {
+  if (CFG && CFG.cal && typeof calSync === 'function') calSync();
   if (!CFG || (CFG.local && !(CFG.ya && !CFG.ya.bad))) return;
   if (SY.busy) { SY.again = true; return; }
   SY.busy = true; SY.state = 'busy'; renderSync();
@@ -656,7 +669,7 @@ function vToday() {
   const meet = open.filter(i => i.type === 'meeting').length;
   const total = all.length, pct = total ? Math.round(done.length / total * 100) : 0;
   const C = 2 * Math.PI * 24;
-  let h = `<div class="card hero"><div><h2>${open.length ? `${open.length} ${plural(open.length, 'запись', 'записи', 'записей')} на сегодня` : total ? 'Все сделано' : 'Свободный день'}</h2><p>${meet ? `${meet} ${plural(meet, 'встреча', 'встречи', 'встреч')}` : 'Встреч нет'}${over.length ? ` · ${over.length} просрочено` : ''}</p></div>
+  let h = (typeof calCardHTML === 'function' ? calCardHTML() : '') + `<div class="card hero"><div><h2>${open.length ? `${open.length} ${plural(open.length, 'запись', 'записи', 'записей')} на сегодня` : total ? 'Все сделано' : 'Свободный день'}</h2><p>${meet ? `${meet} ${plural(meet, 'встреча', 'встречи', 'встреч')}` : 'Встреч нет'}${over.length ? ` · ${over.length} просрочено` : ''}</p></div>
     <div class="ring"><svg width="56" height="56"><circle cx="28" cy="28" r="24" fill="none" stroke="var(--line2)" stroke-width="5"/><circle cx="28" cy="28" r="24" fill="none" stroke="var(--task)" stroke-width="5" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct / 100)}"/></svg><b class="num">${pct}%</b></div></div>`;
   h += sec('Просрочено', over, {}, 'red', `<button class="act" data-act="over-today">На сегодня</button>`);
   if (timed.length) {
@@ -762,6 +775,9 @@ function vSettingsLocal() {
   }
   return back() + `
   ${YA_ENABLED || y ? `<div class="sec"><h3>Синхронизация</h3><div class="card">${ya}</div></div>` : ''}
+  <div class="sec"><h3>Яндекс Календарь</h3><div class="card">${CFG.cal && !CFG.cal.bad
+    ? `<div class="kv"><span>Календарь</span><span style="color:var(--ok)">${esc(CFG.cal.name || 'подключен')}</span></div><div class="note" style="font-size:13px">Записи с датой попадают в Яндекс Календарь с напоминаниями, события из календаря появляются здесь. Обновляется при открытии приложения и каждые полминуты, пока оно открыто.</div><div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:10px"><button class="btn wide" data-act="cal-now">${ic('reset')}Синхронизировать сейчас</button><button class="btn danger wide" data-act="cal-off">Отключить календарь</button></div>`
+    : `<div class="note">Встречи и дела будут и здесь, и в Яндекс Календаре. Яндекс напомнит о них, даже если Планер закрыт.</div><div style="padding:0 14px 14px"><button class="btn primary wide" data-act="cal-login">Подключить Яндекс Календарь</button></div>`}</div></div>
   <div class="sec"><h3>Где хранятся записи</h3><div class="card note">${y && !y.bad ? 'На этом телефоне и на вашем Яндекс Диске' : 'Только на этом телефоне'} (${n} ${plural(n, 'запись', 'записи', 'записей')}). Копию в файл тоже можно сохранить.</div></div>
   <div class="sec"><h3>Резервная копия</h3><div class="card"><div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
     <button class="btn wide" data-act="export">${ic('note')}Сохранить копию в файл</button>
@@ -967,6 +983,10 @@ document.addEventListener('click', async e => {
     case 'over-today': { live().filter(isOverdue).forEach(i => updateItem(i.id, {date: today()})); return snack('Просроченное перенесено на сегодня'); }
     case 'empty-trash': if (confirm('Удалить все записи из корзины навсегда?')) purge(null); return;
     case 'push': return enablePush();
+    case 'cal-login': return calLogin();
+    case 'cal-hide': LS.set('calhide', true); return render();
+    case 'cal-now': return calSync();
+    case 'cal-off': if (confirm('Отключить Яндекс Календарь? События в календаре и записи здесь останутся.')) { delete CFG.cal; LS.set('cfg', CFG); LS.del('calmap'); render(); } return;
     case 'ya-login': return yaLogin();
     case 'ya-off': if (confirm('Отключить Яндекс? Записи останутся на телефоне и на Диске.')) { delete CFG.ya; LS.set('cfg', CFG); SY.state = 'idle'; render(); } return;
     case 'local-notif': { const r = await Notification.requestPermission(); snack(r === 'granted' ? 'Уведомления разрешены' : 'Уведомления не разрешены'); render(); return; }
@@ -1108,6 +1128,19 @@ function applyTheme() {
 // ---------- запуск ----------
 applyTheme();
 // Возврат после входа в Яндекс: #access_token=...&state=ya  (или #ya=... в значке на экране iPhone)
+(function takeCal() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  const tok = h.get('access_token') && h.get('state') === 'cal' ? h.get('access_token') : h.get('cal');
+  if (!tok) return;
+  const exp = h.get('expires_in') ? Date.now() + +h.get('expires_in') * 1000 : +(h.get('exp') || 0);
+  if (!CFG) CFG = {local: true};
+  if (!CFG.cal || CFG.cal.token !== tok) { CFG.cal = {token: tok, exp}; LS.set('cfg', CFG); LS.del('calhide'); }
+  if (CFG.local) TZ = devTZ();
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent), sa = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  if (ios && !sa) history.replaceState(null, '', location.pathname + `#cal=${encodeURIComponent(tok)}&exp=${exp}`);
+  else history.replaceState(null, '', location.pathname);
+  setTimeout(() => snack('Яндекс Календарь подключен, синхронизирую…'), 600);
+})();
 (function takeYa() {
   const h = new URLSearchParams(location.hash.slice(1));
   const tok = h.get('access_token') && h.get('state') === 'ya' ? h.get('access_token') : h.get('ya');
@@ -1123,7 +1156,7 @@ applyTheme();
   setTimeout(() => snack('Яндекс подключен'), 600);
 })();
 h_err();
-function h_err() { const h = new URLSearchParams(location.hash.slice(1)); if (h.get('error') && h.get('state') === 'ya') { history.replaceState(null, '', location.pathname); setTimeout(() => snack('Вход в Яндекс отменен'), 600); return true; } return false; }
+function h_err() { const h = new URLSearchParams(location.hash.slice(1)); if (h.get('error') && (h.get('state') === 'ya' || h.get('state') === 'cal')) { history.replaceState(null, '', location.pathname); setTimeout(() => snack('Вход в Яндекс отменен'), 600); return true; } return false; }
 takeLink(location.href);
 // на iPhone ссылку в адресе оставляем, пока приложение не добавлено на экран «Домой»: иначе значок откроется без ключа
 if (location.hash && (matchMedia('(display-mode: standalone)').matches || navigator.standalone || !/iPhone|iPad|iPod/.test(navigator.userAgent))) history.replaceState(null, '', location.pathname);
@@ -1140,5 +1173,7 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.open && find(e.data.open)) openEditor(e.data.open); });
 }
 </script>
+<script src="cal.js"></script>
+<script>if (CFG && CFG.local) { render(); calSync(); }</script>
 </body>
 </html>
