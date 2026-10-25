@@ -3,17 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Планер</title>
+<title>Успею</title>
 <meta name="theme-color" content="#f3f1ec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#111317" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Планер">
+<meta name="apple-mobile-web-app-title" content="Успею">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png?v=2">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
 <style>
 :root{
   --bg:#f3f1ec;--panel:#f9f8f5;--card:#fff;--line:#e4e0d7;--line2:#eeebe5;--hover:#f1eee8;
@@ -757,7 +757,7 @@ function vSettingsLocal() {
   const n = live().length;
   let notif;
   if (perm === 'granted') notif = '<div class="kv"><span>Уведомления</span><span style="color:var(--ok)">разрешены</span></div>';
-  else if (perm === 'unsupported' || (ios && !standalone)) notif = `<div class="note">${ios ? 'Сначала добавьте Планер на экран «Домой» (ниже) и откройте его оттуда.' : 'Этот браузер не умеет показывать уведомления.'}</div>`;
+  else if (perm === 'unsupported' || (ios && !standalone)) notif = `<div class="note">${ios ? 'Сначала добавьте «Успею» на экран «Домой» (ниже) и откройте его оттуда.' : 'Этот браузер не умеет показывать уведомления.'}</div>`;
   else if (perm === 'denied') notif = '<div class="note">Уведомления запрещены в настройках телефона. Разрешите их там.</div>';
   else notif = `<div style="padding:12px 14px"><button class="btn primary wide" data-act="local-notif">${ic('bell')}Разрешить уведомления</button></div>`;
   const y = CFG.ya;
@@ -767,7 +767,7 @@ function vSettingsLocal() {
     ya = `<div class="kv"><span>Яндекс Диск</span><span style="color:var(--ok)">подключен</span></div>
       <div class="kv"><span>Состояние</span><span>${SY.state === 'err' ? `<span style="color:var(--danger)">${esc(SY.err)}</span>` : SY.state === 'busy' ? 'идет…' : 'все в порядке'}</span></div>
       <div class="kv"><span>Последняя</span><span>${last ? `${last.toLocaleDateString('ru-RU')} ${pad(last.getHours())}:${pad(last.getMinutes())}` : 'еще не было'}</span></div>
-      <div class="note" style="font-size:13px">Записи хранятся в вашем Яндекс Диске, папка «Приложения/Планер». Войдите в Планер с тем же Яндексом на другом телефоне, и записи будут одинаковыми.</div>
+      <div class="note" style="font-size:13px">Записи хранятся в вашем Яндекс Диске, папка «Приложения/Планер». Войдите в «Успею» с тем же Яндексом на другом телефоне, и записи будут одинаковыми.</div>
       <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:10px"><button class="btn wide" data-act="sync">${ic('reset')}Синхронизировать сейчас</button><button class="btn danger wide" data-act="ya-off">Отключить Яндекс</button></div>`;
   } else {
     ya = `<div class="note">${y && y.bad ? '<b style="color:var(--danger)">Вход в Яндекс устарел, войдите снова.</b><br>' : ''}Войдите через Яндекс, и записи будут храниться на вашем Яндекс Диске. Так их не потерять при смене телефона, и можно пользоваться на двух телефонах сразу.</div>
@@ -777,16 +777,16 @@ function vSettingsLocal() {
   ${YA_ENABLED || y ? `<div class="sec"><h3>Синхронизация</h3><div class="card">${ya}</div></div>` : ''}
   <div class="sec"><h3>Яндекс Календарь</h3><div class="card">${CFG.cal && !CFG.cal.bad
     ? `<div class="kv"><span>Календарь</span><span style="color:var(--ok)">${esc(CFG.cal.name || 'подключен')}</span></div><div class="note" style="font-size:13px">Записи с датой попадают в Яндекс Календарь с напоминаниями, события из календаря появляются здесь. Обновляется при открытии приложения и каждые полминуты, пока оно открыто.</div><div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:10px"><button class="btn wide" data-act="cal-now">${ic('reset')}Синхронизировать сейчас</button><button class="btn danger wide" data-act="cal-off">Отключить календарь</button></div>`
-    : `<div class="note">Встречи и дела будут и здесь, и в Яндекс Календаре. Яндекс напомнит о них, даже если Планер закрыт.</div><div style="padding:0 14px 14px"><button class="btn primary wide" data-act="cal-login">Подключить Яндекс Календарь</button></div>`}</div></div>
+    : `<div class="note">Встречи и дела будут и здесь, и в Яндекс Календаре. Яндекс напомнит о них, даже если приложение закрыто.</div><div style="padding:0 14px 14px"><button class="btn primary wide" data-act="cal-login">Подключить Яндекс Календарь</button></div>`}</div></div>
   <div class="sec"><h3>Где хранятся записи</h3><div class="card note">${y && !y.bad ? 'На этом телефоне и на вашем Яндекс Диске' : 'Только на этом телефоне'} (${n} ${plural(n, 'запись', 'записи', 'записей')}). Копию в файл тоже можно сохранить.</div></div>
   <div class="sec"><h3>Резервная копия</h3><div class="card"><div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
     <button class="btn wide" data-act="export">${ic('note')}Сохранить копию в файл</button>
     <button class="btn wide" data-act="import">${ic('undo')}Восстановить из файла</button>
     <input type="file" id="impf" accept="application/json,.json" hidden></div></div></div>
-  <div class="sec"><h3>Напоминания</h3><div class="card">${notif}<div class="note" style="font-size:13px;color:var(--ink3)">Напоминание срабатывает, пока Планер открыт или свернут недавно. Если приложение долго не открывали, пропущенное покажется при следующем запуске.</div></div></div>
+  <div class="sec"><h3>Напоминания</h3><div class="card">${notif}<div class="note" style="font-size:13px;color:var(--ink3)">Напоминание срабатывает, пока приложение открыто или недавно свернуто. Если приложение долго не открывали, пропущенное покажется при следующем запуске.</div></div></div>
   <div class="sec"><h3>Оформление</h3><div class="seg">${[['auto', 'Как в системе'], ['light', 'Светлая'], ['dark', 'Темная']].map(([k, l]) => `<button class="${th === k ? 'on' : ''}" data-theme="${k}">${l}</button>`).join('')}</div></div>
   <div class="sec"><h3>Установка на экран</h3><div class="card note">${ios
-    ? 'Safari: кнопка «Поделиться» внизу, затем «На экран «Домой»». Значок Планера появится рядом с приложениями.'
+    ? 'Safari: кнопка «Поделиться» внизу, затем «На экран «Домой»». Значок «Успею» появится рядом с приложениями.'
     : 'Chrome: меню ⋮ справа сверху, затем «Добавить на главный экран» или «Установить приложение».'}${standalone ? '<br><b>Уже установлено.</b>' : ''}</div></div>
   <div class="sec"><button class="btn danger wide" data-act="logout">Удалить все записи с телефона</button></div>`;
 }
@@ -802,8 +802,8 @@ function vSettings() {
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
   const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   let push;
-  if (subbed) push = `<div class="kv"><span>Уведомления</span><span style="color:var(--ok)">включены</span></div><div class="note">Напоминания приходят на телефон, когда компьютер включен и Планер на нем запущен.</div>`;
-  else if (!pushOk || (ios && !standalone)) push = `<div class="note">${ios ? 'Чтобы на iPhone приходили напоминания, сначала добавьте Планер на экран «Домой» (ниже), откройте его оттуда и включите уведомления здесь.' : 'Этот браузер не умеет показывать уведомления. Откройте Планер в Chrome.'}</div>`;
+  if (subbed) push = `<div class="kv"><span>Уведомления</span><span style="color:var(--ok)">включены</span></div><div class="note">Напоминания приходят на телефон, когда компьютер включен и «Успею» на нем запущено.</div>`;
+  else if (!pushOk || (ios && !standalone)) push = `<div class="note">${ios ? 'Чтобы на iPhone приходили напоминания, сначала добавьте «Успею» на экран «Домой» (ниже), откройте его оттуда и включите уведомления здесь.' : 'Этот браузер не умеет показывать уведомления. Откройте «Успею» в Chrome.'}</div>`;
   else if (perm === 'denied') push = `<div class="note">Уведомления запрещены в настройках телефона для этого приложения. Разрешите их там и вернитесь сюда.</div>`;
   else if (!(REM && REM.vapid)) push = `<div class="note">Уведомления можно будет включить после первой синхронизации с компьютером.</div>`;
   else push = `<div class="note">Напоминания будут приходить на телефон, как на компьютере.</div><div style="padding:0 14px 14px"><button class="btn primary wide" data-act="push">${ic('bell')}Включить уведомления</button></div>`;
@@ -818,7 +818,7 @@ function vSettings() {
   <div class="sec"><h3>Уведомления</h3><div class="card">${push}</div></div>
   <div class="sec"><h3>Оформление</h3><div class="seg">${[['auto', 'Как в системе'], ['light', 'Светлая'], ['dark', 'Темная']].map(([k, l]) => `<button class="${th === k ? 'on' : ''}" data-theme="${k}">${l}</button>`).join('')}</div></div>
   <div class="sec"><h3>Установка на экран</h3><div class="card note">${ios
-    ? 'Safari: кнопка «Поделиться» внизу, затем «На экран «Домой»». Значок Планера появится рядом с приложениями.'
+    ? 'Safari: кнопка «Поделиться» внизу, затем «На экран «Домой»». Значок «Успею» появится рядом с приложениями.'
     : 'Chrome: меню ⋮ справа сверху, затем «Добавить на главный экран» или «Установить приложение».'}${standalone ? '<br><b>Уже установлено.</b>' : ''}</div></div>
   <div class="sec"><button class="btn danger wide" data-act="logout">Отключить этот телефон</button></div>`;
 }
@@ -1007,7 +1007,7 @@ document.addEventListener('click', async e => {
       };
       f.click(); return;
     }
-    case 'logout': if (confirm(CFG.local ? 'Удалить все записи с этого телефона? Это нельзя отменить.' : 'Отключить телефон от Планера? Записи на компьютере останутся.')) { LS.del('cfg'); LS.del('doc'); LS.del('remote'); LS.del('sha'); LS.del('pushsub'); CFG = null; D = {items: [], purged: {}}; REM = null; SHA = null; $('#app').innerHTML = ''; render(); } return;
+    case 'logout': if (confirm(CFG.local ? 'Удалить все записи с этого телефона? Это нельзя отменить.' : 'Отключить телефон от компьютера? Записи на компьютере останутся.')) { LS.del('cfg'); LS.del('doc'); LS.del('remote'); LS.del('sha'); LS.del('pushsub'); CFG = null; D = {items: [], purged: {}}; REM = null; SHA = null; $('#app').innerHTML = ''; render(); } return;
   }
 });
 $('#scrim').addEventListener('click', () => closeEditor());
@@ -1096,13 +1096,13 @@ async function localTick() {
 
 // ---------- первый запуск ----------
 function renderSetup() {
-  $('#app').innerHTML = `<div class="setup"><img src="icon-192.png" alt=""><h1>Планер</h1>
+  $('#app').innerHTML = `<div class="setup"><img src="icon-192.png" alt=""><h1>Успею</h1>
   <p>Встречи, дела и напоминания в одном месте. Пишите как говорите: «встреча с врачом в пятницу в 10», «оплатить аренду 5 числа каждого месяца», «напомни через 2 часа позвонить маме».</p>
   <button class="btn primary wide" style="margin-top:18px" data-act="local">Начать</button>
   ${YA_ENABLED ? `<button class="btn wide" style="margin-top:10px" data-act="ya-start">Войти через Яндекс</button>
   <p style="font-size:13.5px;color:var(--ink3);margin-top:8px">С Яндексом записи хранятся на вашем Яндекс Диске и одинаковы на всех ваших телефонах.</p>` : ''}
-  <details style="margin-top:28px"><summary style="color:var(--ink3);cursor:pointer">У меня Планер на компьютере</summary>
-  <p>Откройте на компьютере Планер, «Настройки - Телефон», и наведите камеру телефона на QR-код. Или вставьте ссылку из настроек:</p>
+  <details style="margin-top:28px"><summary style="color:var(--ink3);cursor:pointer">У меня «Успею» на компьютере</summary>
+  <p>Откройте на компьютере «Успею», «Настройки - Телефон», и наведите камеру телефона на QR-код. Или вставьте ссылку из настроек:</p>
   <input class="in" id="lnk" placeholder="https://…#k=…" autocapitalize="off" autocomplete="off">
   <button class="btn wide" style="margin-top:10px" data-act="link">Подключить</button></details></div>`;
   if (YA_ENABLED) $('[data-act=ya-start]').onclick = () => { CFG = {local: true}; LS.set('cfg', CFG); yaLogin(); };

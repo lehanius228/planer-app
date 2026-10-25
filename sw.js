@@ -1,5 +1,5 @@
 // Планер: работа без интернета и уведомления о напоминаниях.
-const CACHE = 'planer-v5';
+const CACHE = 'planer-v6';
 const SHELL = ['./', 'index.html', 'parse_ru.js', 'cal.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'badge.png'];
 
 self.addEventListener('install', e => {
@@ -22,8 +22,8 @@ self.addEventListener('fetch', e => {
 
 self.addEventListener('push', e => {
   let d = {};
-  try { d = e.data ? e.data.json() : {}; } catch { d = {title: 'Планер', body: e.data ? e.data.text() : ''}; }
-  e.waitUntil(self.registration.showNotification(d.title || 'Планер', {
+  try { d = e.data ? e.data.json() : {}; } catch { d = {title: 'Успею', body: e.data ? e.data.text() : ''}; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Успею', {
     body: d.body || '',
     icon: 'icon-192.png',
     badge: 'badge.png',
