@@ -473,6 +473,8 @@ function mergeInto(remote) {
 }
 function queueSync(ms = 0) { clearTimeout(SY.timer); SY.timer = setTimeout(sync, ms); }
 // ---------- синхронизация через Яндекс Диск (папка приложения) ----------
+// Яндекс Диск не отдает файлы в браузер (нет CORS у downloader), поэтому вход через Яндекс пока скрыт
+const YA_ENABLED = false;
 const YA_CLIENT = 'b03c086153504ad3849e914ec74b4240';
 const YA_FILE = 'app:/planer.json';
 const yaHdr = () => ({Authorization: 'OAuth ' + CFG.ya.token});
@@ -759,7 +761,7 @@ function vSettingsLocal() {
       <div style="padding:0 14px 14px"><button class="btn primary wide" data-act="ya-login">Войти через Яндекс</button></div>`;
   }
   return back() + `
-  <div class="sec"><h3>Синхронизация</h3><div class="card">${ya}</div></div>
+  ${YA_ENABLED || y ? `<div class="sec"><h3>Синхронизация</h3><div class="card">${ya}</div></div>` : ''}
   <div class="sec"><h3>Где хранятся записи</h3><div class="card note">${y && !y.bad ? 'На этом телефоне и на вашем Яндекс Диске' : 'Только на этом телефоне'} (${n} ${plural(n, 'запись', 'записи', 'записей')}). Копию в файл тоже можно сохранить.</div></div>
   <div class="sec"><h3>Резервная копия</h3><div class="card"><div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
     <button class="btn wide" data-act="export">${ic('note')}Сохранить копию в файл</button>
@@ -1077,13 +1079,13 @@ function renderSetup() {
   $('#app').innerHTML = `<div class="setup"><img src="icon-192.png" alt=""><h1>Планер</h1>
   <p>Встречи, дела и напоминания в одном месте. Пишите как говорите: «встреча с врачом в пятницу в 10», «оплатить аренду 5 числа каждого месяца», «напомни через 2 часа позвонить маме».</p>
   <button class="btn primary wide" style="margin-top:18px" data-act="local">Начать</button>
-  <button class="btn wide" style="margin-top:10px" data-act="ya-start">Войти через Яндекс</button>
-  <p style="font-size:13.5px;color:var(--ink3);margin-top:8px">С Яндексом записи хранятся на вашем Яндекс Диске и одинаковы на всех ваших телефонах.</p>
+  ${YA_ENABLED ? `<button class="btn wide" style="margin-top:10px" data-act="ya-start">Войти через Яндекс</button>
+  <p style="font-size:13.5px;color:var(--ink3);margin-top:8px">С Яндексом записи хранятся на вашем Яндекс Диске и одинаковы на всех ваших телефонах.</p>` : ''}
   <details style="margin-top:28px"><summary style="color:var(--ink3);cursor:pointer">У меня Планер на компьютере</summary>
   <p>Откройте на компьютере Планер, «Настройки - Телефон», и наведите камеру телефона на QR-код. Или вставьте ссылку из настроек:</p>
   <input class="in" id="lnk" placeholder="https://…#k=…" autocapitalize="off" autocomplete="off">
   <button class="btn wide" style="margin-top:10px" data-act="link">Подключить</button></details></div>`;
-  $('[data-act=ya-start]').onclick = () => { CFG = {local: true}; LS.set('cfg', CFG); yaLogin(); };
+  if (YA_ENABLED) $('[data-act=ya-start]').onclick = () => { CFG = {local: true}; LS.set('cfg', CFG); yaLogin(); };
   $('[data-act=local]').onclick = () => { CFG = {local: true}; LS.set('cfg', CFG); TZ = devTZ(); $('#app').innerHTML = ''; render(); };
   $('[data-act=link]').onclick = () => { if (takeLink($('#lnk').value)) { $('#app').innerHTML = ''; render(); queueSync(0); } else snack('Ссылка не подходит'); };
 }
