@@ -295,7 +295,9 @@ let CFG = LS.get('cfg', null);           // {token, repo}
 let D = LS.get('doc', {items: [], purged: {}});   // рабочая копия
 let REM = LS.get('remote', null);        // последняя увиденная облачная копия
 let SHA = LS.get('sha', null);
-let TZ = (REM && REM.tz != null) ? +REM.tz : 3;
+// Пояс: при связке с компьютером - как в Планере на компьютере, без связки - как на телефоне
+const devTZ = () => -new Date().getTimezoneOffset() / 60;
+let TZ = CFG && CFG.local ? devTZ() : (REM && REM.tz != null) ? +REM.tz : 3;
 const saveLocal = () => { LS.set('doc', D); LS.set('remote', REM); LS.set('sha', SHA); };
 
 // ---------- время планера (по умолчанию Москва) ----------
@@ -471,7 +473,7 @@ function mergeInto(remote) {
 }
 function queueSync(ms = 0) { clearTimeout(SY.timer); SY.timer = setTimeout(sync, ms); }
 async function sync() {
-  if (!CFG) return;
+  if (!CFG || CFG.local) return;
   if (SY.busy) { SY.again = true; return; }
   SY.busy = true; SY.state = 'busy'; renderSync();
   try {
@@ -560,6 +562,7 @@ function renderTabs() {
 }
 function renderSync() {
   const b = $('#syncb'); if (!b) return;
+  if (CFG && CFG.local) { b.style.display = 'none'; return; }
   const cls = SY.state === 'busy' ? 'busy' : SY.state === 'ok' ? 'ok' : SY.state === 'err' ? 'err' : 'warn';
   let txt = SY.state === 'busy' ? 'Синхр…' : SY.state === 'err' ? 'Нет связи' : 'Синхр.';
   if (SY.state === 'ok' && SY.last) { const d = new Date(SY.last); txt = `${pad(d.getHours())}:${pad(d.getMinutes())}`; }
@@ -687,7 +690,32 @@ function vTrash() {
   return back() + (L.length ? sec('В корзине', L, {trash: true}, '', `<button class="act" data-act="empty-trash">Очистить</button>`) + '<p class="note">Смахните запись вправо, чтобы вернуть.</p>' : empty('Корзина пуста', ''));
 }
 const back = () => `<button class="btn" data-tab="more" style="margin-bottom:14px">${ic('left')}Назад</button>`;
+function vSettingsLocal() {
+  const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const th = LS.get('theme', 'auto');
+  const n = live().length;
+  let notif;
+  if (perm === 'granted') notif = '<div class="kv"><span>Уведомления</span><span style="color:var(--ok)">разрешены</span></div>';
+  else if (perm === 'unsupported' || (ios && !standalone)) notif = `<div class="note">${ios ? 'Сначала добавьте Планер на экран «Домой» (ниже) и откройте его оттуда.' : 'Этот браузер не умеет показывать уведомления.'}</div>`;
+  else if (perm === 'denied') notif = '<div class="note">Уведомления запрещены в настройках телефона. Разрешите их там.</div>';
+  else notif = `<div style="padding:12px 14px"><button class="btn primary wide" data-act="local-notif">${ic('bell')}Разрешить уведомления</button></div>`;
+  return back() + `
+  <div class="sec"><h3>Где хранятся записи</h3><div class="card note">Только на этом телефоне (${n} ${plural(n, 'запись', 'записи', 'записей')}). Чтобы не потерять их при смене телефона, иногда сохраняйте копию в файл.</div></div>
+  <div class="sec"><h3>Резервная копия</h3><div class="card"><div style="padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+    <button class="btn wide" data-act="export">${ic('note')}Сохранить копию в файл</button>
+    <button class="btn wide" data-act="import">${ic('undo')}Восстановить из файла</button>
+    <input type="file" id="impf" accept="application/json,.json" hidden></div></div></div>
+  <div class="sec"><h3>Напоминания</h3><div class="card">${notif}<div class="note" style="font-size:13px;color:var(--ink3)">Напоминание срабатывает, пока Планер открыт или свернут недавно. Если приложение долго не открывали, пропущенное покажется при следующем запуске.</div></div></div>
+  <div class="sec"><h3>Оформление</h3><div class="seg">${[['auto', 'Как в системе'], ['light', 'Светлая'], ['dark', 'Темная']].map(([k, l]) => `<button class="${th === k ? 'on' : ''}" data-theme="${k}">${l}</button>`).join('')}</div></div>
+  <div class="sec"><h3>Установка на экран</h3><div class="card note">${ios
+    ? 'Safari: кнопка «Поделиться» внизу, затем «На экран «Домой»». Значок Планера появится рядом с приложениями.'
+    : 'Chrome: меню ⋮ справа сверху, затем «Добавить на главный экран» или «Установить приложение».'}${standalone ? '<br><b>Уже установлено.</b>' : ''}</div></div>
+  <div class="sec"><button class="btn danger wide" data-act="logout">Удалить все записи с телефона</button></div>`;
+}
 function vSettings() {
+  if (CFG.local) return vSettingsLocal();
   const last = SY.last ? new Date(SY.last) : null;
   const lastTxt = last ? `${last.toLocaleDateString('ru-RU')} ${pad(last.getHours())}:${pad(last.getMinutes())}` : 'еще не было';
   const pc = REM && REM.pc ? REM.pc.replace('T', ' ') : 'неизвестно';
@@ -879,7 +907,25 @@ document.addEventListener('click', async e => {
     case 'over-today': { live().filter(isOverdue).forEach(i => updateItem(i.id, {date: today()})); return snack('Просроченное перенесено на сегодня'); }
     case 'empty-trash': if (confirm('Удалить все записи из корзины навсегда?')) purge(null); return;
     case 'push': return enablePush();
-    case 'logout': if (confirm('Отключить телефон от Планера? Записи на компьютере останутся.')) { LS.del('cfg'); LS.del('doc'); LS.del('remote'); LS.del('sha'); LS.del('pushsub'); CFG = null; D = {items: [], purged: {}}; REM = null; SHA = null; $('#app').innerHTML = ''; render(); } return;
+    case 'local-notif': { const r = await Notification.requestPermission(); snack(r === 'granted' ? 'Уведомления разрешены' : 'Уведомления не разрешены'); render(); return; }
+    case 'export': {
+      const blob = new Blob([JSON.stringify({planer: 1, items: D.items, purged: D.purged}, null, 1)], {type: 'application/json'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `planer-${today()}.json`;
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); return;
+    }
+    case 'import': {
+      const f = $('#impf');
+      f.onchange = async () => {
+        try {
+          const j = JSON.parse(await f.files[0].text());
+          if (!Array.isArray(j.items)) throw 0;
+          if (!confirm(`Восстановить ${j.items.length} записей из файла? Уже имеющиеся записи не задвоятся.`)) return;
+          mergeInto({items: j.items, purged: j.purged || {}}); changed(); snack('Восстановлено');
+        } catch { snack('Файл не подходит'); }
+      };
+      f.click(); return;
+    }
+    case 'logout': if (confirm(CFG.local ? 'Удалить все записи с этого телефона? Это нельзя отменить.' : 'Отключить телефон от Планера? Записи на компьютере останутся.')) { LS.del('cfg'); LS.del('doc'); LS.del('remote'); LS.del('sha'); LS.del('pushsub'); CFG = null; D = {items: [], purged: {}}; REM = null; SHA = null; $('#app').innerHTML = ''; render(); } return;
   }
 });
 $('#scrim').addEventListener('click', () => closeEditor());
@@ -940,13 +986,42 @@ async function enablePush() {
   } catch (err) { snack('Не получилось: ' + (err.message || err)); }
 }
 
+// ---------- напоминания без компьютера ----------
+async function localTick() {
+  if (!CFG || !CFG.local) return;
+  const now = tzNow().getTime(); let hit = false;
+  for (const it of live()) {
+    if (it.done || !it.remind.length) continue;
+    const b = baseDT(it); if (!b) continue;
+    for (const off of it.remind) {
+      const k = fireKey(it, off);
+      if (it.fired.includes(k)) continue;
+      const ft = b.getTime() - off * 6e4;
+      if (now < ft) continue;
+      it.fired.push(k); hit = true;
+      if (now - ft > 6 * 3600e3) continue;
+      const when = (off === 0 ? 'Сейчас' : remindLabel(off).replace('за ', 'Через ')) + ` · ${dayLabel(it.date)}` + (it.time ? ` в ${it.time}` : '');
+      try {
+        if (typeof Notification !== 'undefined' && Notification.permission === 'granted' && navigator.serviceWorker) {
+          const reg = await navigator.serviceWorker.ready;
+          await reg.showNotification(it.title, {body: when + (it.place ? ` · ${it.place}` : ''), icon: 'icon-192.png', badge: 'badge.png', tag: it.id, data: {id: it.id}});
+        } else snack(`${it.title}: ${when}`);
+      } catch { snack(`${it.title}: ${when}`); }
+    }
+  }
+  if (hit) saveLocal();
+}
+
 // ---------- первый запуск ----------
 function renderSetup() {
   $('#app').innerHTML = `<div class="setup"><img src="icon-192.png" alt=""><h1>Планер</h1>
-  <p>Чтобы телефон видел записи с компьютера, откройте на компьютере Планер, зайдите в «Настройки - Телефон» и наведите камеру телефона на QR-код.</p>
-  <p style="margin-top:22px">Или вставьте ссылку из настроек:</p>
+  <p>Встречи, дела и напоминания в одном месте. Пишите как говорите: «встреча с врачом в пятницу в 10», «оплатить аренду 5 числа каждого месяца», «напомни через 2 часа позвонить маме».</p>
+  <button class="btn primary wide" style="margin-top:18px" data-act="local">Начать</button>
+  <details style="margin-top:28px"><summary style="color:var(--ink3);cursor:pointer">У меня Планер на компьютере</summary>
+  <p>Откройте на компьютере Планер, «Настройки - Телефон», и наведите камеру телефона на QR-код. Или вставьте ссылку из настроек:</p>
   <input class="in" id="lnk" placeholder="https://…#k=…" autocapitalize="off" autocomplete="off">
-  <button class="btn primary wide" style="margin-top:10px" data-act="link">Подключить</button></div>`;
+  <button class="btn wide" style="margin-top:10px" data-act="link">Подключить</button></details></div>`;
+  $('[data-act=local]').onclick = () => { CFG = {local: true}; LS.set('cfg', CFG); TZ = devTZ(); $('#app').innerHTML = ''; render(); };
   $('[data-act=link]').onclick = () => { if (takeLink($('#lnk').value)) { $('#app').innerHTML = ''; render(); queueSync(0); } else snack('Ссылка не подходит'); };
 }
 function takeLink(str) {
@@ -973,6 +1048,7 @@ if (location.hash && (matchMedia('(display-mode: standalone)').matches || naviga
 render();
 if (location.search.includes('open=')) { const id = new URLSearchParams(location.search).get('open'); history.replaceState(null, '', location.pathname); setTimeout(() => find(id) && openEditor(id), 300); }
 queueSync(0);
+localTick(); setInterval(localTick, 20000);
 setInterval(() => { if (document.visibilityState === 'visible') queueSync(0); }, 30000);
 setInterval(() => { if (document.visibilityState === 'visible' && !E && !document.activeElement?.matches('input,textarea')) render(); }, 60000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { queueSync(0); render(); } });

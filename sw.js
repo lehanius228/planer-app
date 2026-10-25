@@ -1,5 +1,5 @@
 // Планер: работа без интернета и уведомления о напоминаниях.
-const CACHE = 'planer-v1';
+const CACHE = 'planer-v2';
 const SHELL = ['./', 'index.html', 'parse_ru.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'badge.png'];
 
 self.addEventListener('install', e => {
