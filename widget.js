@@ -105,6 +105,38 @@ function monthImage() {
   return c.getImage();
 }
 
+// --- экран блокировки ---
+const fam = config.widgetFamily || "";
+if (fam.startsWith("accessory")) {
+  const a = new ListWidget();
+  a.url = OPEN_URL;
+  a.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
+  const next = upcoming[0];
+  const todayCount = upcoming.filter(i => i.date === today).length;
+  const whenOf = it => it.date === today ? (it.time || "сегодня") : it.date === tomorrow ? `завтра${it.time ? " " + it.time : ""}` :
+    fromIso(it.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short" }) + (it.time ? " " + it.time : "");
+  if (fam === "accessoryInline") {
+    // строка над часами
+    const t = weather && weather.current ? `${Math.round(weather.current.temperature_2m)}°  ` : "";
+    a.addText(next ? `${t}${whenOf(next)} · ${next.title}` : `${t}Дел нет`);
+  } else if (fam === "accessoryCircular") {
+    a.addAccessoryWidgetBackground = true;
+    const s = a.addStack(); s.layoutVertically(); s.centerAlignContent();
+    const n = s.addText(String(todayCount)); n.font = Font.boldRoundedSystemFont(24); n.centerAlignText();
+    const l = s.addText("сегодня"); l.font = Font.systemFont(9); l.centerAlignText();
+  } else {
+    // прямоугольный: два ближайших дела
+    const h = a.addText(overdue ? `Успею · просрочено ${overdue}` : "Успею");
+    h.font = Font.boldSystemFont(13);
+    if (!upcoming.length) { const e = a.addText("Дел нет"); e.font = Font.systemFont(13); }
+    for (const it of upcoming.slice(0, 2)) {
+      const r = a.addText(`${whenOf(it)}  ${it.title || "Без названия"}`);
+      r.font = Font.systemFont(13); r.lineLimit = 1;
+    }
+  }
+  return a;
+}
+
 // --- сборка ---
 const w = new ListWidget();
 const g = new LinearGradient();
