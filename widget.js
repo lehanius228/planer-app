@@ -28,8 +28,9 @@ async function cached(name, loader) {
 }
 
 const doc = await cached("uspeyu_cache.json", async () => {
-  const r = new Request(`https://api.github.com/repos/${REPO}/contents/sync.json`);
-  r.headers = { Authorization: "Bearer " + TOKEN, Accept: "application/vnd.github.raw+json" };
+  const r = new Request(`https://api.github.com/repos/${REPO}/contents/sync.json?t=${Date.now()}`);
+  r.headers = { Authorization: "Bearer " + TOKEN, Accept: "application/vnd.github.raw+json", "Cache-Control": "no-cache", Pragma: "no-cache" };
+  r.timeoutInterval = 20;
   const d = JSON.parse(await r.loadString());
   if (!d.items) throw new Error("bad");
   return d;
@@ -110,7 +111,7 @@ const fam = config.widgetFamily || "";
 if (fam.startsWith("accessory")) {
   const a = new ListWidget();
   a.url = OPEN_URL;
-  a.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
+  a.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
   const next = upcoming[0];
   const todayCount = upcoming.filter(i => i.date === today).length;
   const whenOf = it => it.date === today ? (it.time || "сегодня") : it.date === tomorrow ? `завтра${it.time ? " " + it.time : ""}` :
@@ -221,7 +222,7 @@ if (weather && weather.daily && weather.daily.time && weather.daily.time.length 
     if (k < 3) fr.addSpacer();
   }
 }
-w.refreshAfterDate = new Date(Date.now() + 15 * 60 * 1000);
+w.refreshAfterDate = new Date(Date.now() + 5 * 60 * 1000);
 
 return w;
 };
