@@ -23,23 +23,34 @@ function nextDate(d, rep) {
 const fm = FileManager.local();
 async function cached(name, loader) {
   const p = fm.joinPath(fm.documentsDirectory(), name);
-  try { const v = await loader(); fm.writeString(p, JSON.stringify(v)); return v; }
-  catch (e) { return fm.fileExists(p) ? JSON.parse(fm.readString(p)) : null; }
+  let saved = null;
+  try { if (fm.fileExists(p)) saved = JSON.parse(fm.readString(p)); } catch (e) {}
+  try {
+    const v = await loader();
+    try { fm.writeString(p, JSON.stringify(v)); } catch (e) {}
+    return { data: v, stale: false };
+  } catch (e) { return { data: saved, stale: true }; }
 }
 
-const doc = await cached("uspeyu_cache.json", async () => {
+// Оба запроса выполняются одновременно, чтобы не складывать время ожидания.
+const [sync, forecast] = await Promise.all([cached("uspeyu_cache.json", async () => {
   const r = new Request(`https://api.github.com/repos/${REPO}/contents/sync.json?t=${Date.now()}`);
   r.headers = { Authorization: "Bearer " + TOKEN, Accept: "application/vnd.github.raw+json", "Cache-Control": "no-cache", Pragma: "no-cache" };
-  r.timeoutInterval = 20;
+  r.timeoutInterval = 3;
   const d = JSON.parse(await r.loadString());
-  if (!d.items) throw new Error("bad");
+  if (!d || !Array.isArray(d.items)) throw new Error("bad");
   return d;
-}) || { items: [] };
-
-const weather = await cached("uspeyu_weather.json", async () => {
+}), cached("uspeyu_weather.json", async () => {
   const r = new Request(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=4`);
-  return await r.loadJSON();
-});
+  r.timeoutInterval = 3;
+  const d = await r.loadJSON();
+  if (!d || !d.current || !Number.isFinite(d.current.temperature_2m)) throw new Error("bad weather");
+  return d;
+})]);
+const hasData = !!sync.data && Array.isArray(sync.data.items);
+const doc = hasData ? sync.data : { items: [] };
+const weather = forecast.data;
+const dataTitle = sync.stale ? "Успею · нет связи" : "Успею";
 
 const now = new Date();
 const today = iso(now);
@@ -119,17 +130,17 @@ if (fam.startsWith("accessory")) {
   if (fam === "accessoryInline") {
     // строка над часами
     const t = weather && weather.current ? `${Math.round(weather.current.temperature_2m)}°  ` : "";
-    a.addText(next ? `${t}${whenOf(next)} · ${next.title}` : `${t}Дел нет`);
+    a.addText(!hasData ? `${t}Нет связи с Успею` : next ? `${t}${whenOf(next)} · ${next.title}` : `${t}Дел нет`);
   } else if (fam === "accessoryCircular") {
     a.addAccessoryWidgetBackground = true;
     const s = a.addStack(); s.layoutVertically(); s.centerAlignContent();
-    const n = s.addText(String(todayCount)); n.font = Font.boldRoundedSystemFont(24); n.centerAlignText();
-    const l = s.addText("сегодня"); l.font = Font.systemFont(9); l.centerAlignText();
+    const n = s.addText(hasData ? String(todayCount) : "?"); n.font = Font.boldRoundedSystemFont(24); n.centerAlignText();
+    const l = s.addText(hasData ? "сегодня" : "нет связи"); l.font = Font.systemFont(9); l.centerAlignText();
   } else {
     // прямоугольный: два ближайших дела
-    const h = a.addText(overdue ? `Успею · просрочено ${overdue}` : "Успею");
+    const h = a.addText(sync.stale ? dataTitle : overdue ? `Успею · просрочено ${overdue}` : "Успею");
     h.font = Font.boldSystemFont(13);
-    if (!upcoming.length) { const e = a.addText("Дел нет"); e.font = Font.systemFont(13); }
+    if (!upcoming.length) { const e = a.addText(hasData ? "Дел нет" : "Не удалось загрузить дела"); e.font = Font.systemFont(13); }
     for (const it of upcoming.slice(0, 2)) {
       const r = a.addText(`${whenOf(it)}  ${it.title || "Без названия"}`);
       r.font = Font.systemFont(13); r.lineLimit = 1;
@@ -185,12 +196,12 @@ w.addSpacer(14);
 
 // низ: дела из Успею
 const listHead = w.addStack();
-const lh = listHead.addText("Успею"); lh.font = Font.semiboldSystemFont(12); lh.textColor = DIM;
+const lh = listHead.addText(dataTitle); lh.font = Font.semiboldSystemFont(12); lh.textColor = DIM;
 listHead.addSpacer();
 if (overdue) { const od = listHead.addText(`просрочено ${overdue}`); od.font = Font.mediumSystemFont(11); od.textColor = new Color("#FF6B5B"); }
 w.addSpacer(6);
 if (!upcoming.length) {
-  const e = w.addText("Дел нет. Можно отдыхать"); e.font = Font.systemFont(13); e.textColor = DIM;
+  const e = w.addText(hasData ? "Дел нет. Можно отдыхать" : "Не удалось загрузить дела"); e.font = Font.systemFont(13); e.textColor = DIM;
 } else {
   for (const it of upcoming.slice(0, upcoming.length > 3 ? 4 : 3)) {
     const row = w.addStack(); row.centerAlignContent();
